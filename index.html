@@ -21,7 +21,7 @@ fieldset {
 	border: none;
 }
 
-label {
+label, .label {
 	display: block;
 	margin: 1em 0 0;
 }
@@ -31,7 +31,7 @@ label.checkboxlabel {
 	margin: auto;
 }
 
-input, textarea {
+input, textarea, .output {
 	display: block;
 	width: 100%;
 	margin: .5rem 0;
@@ -64,31 +64,10 @@ input[type=button]:hover {
 	background-color: #eee;
 }
 
-.label {
-	margin: 1em 0 0;
-}
-
-.output {
-	display: block;
-	width: 100%;
-	margin: .5em 0;
-	padding: 1em;
-	background-color: #eee;
-	border: 1px solid #ccc;
-	border-radius: 5px;
-	box-sizing: border-box;
-}
-
 table {
 	width: 100%;
 	font-size: .75rem;
 	border-collapse: collapse;
-}
-
-td {
-	padding: .5rem 0;
-	border-bottom: 1px solid #ccc;
-	vertical-align: top;
 }
 
 tr:first-child td {
@@ -98,6 +77,12 @@ tr:first-child td {
 tr:last-child td {
 	border-bottom: none;
 	padding-bottom: 0;
+}
+
+td {
+	padding: .5rem 0;
+	border-bottom: 1px solid #ccc;
+	vertical-align: top;
 }
 
 td.filesize {
