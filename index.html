@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Torrent File Decoder</title>
+<style>
+* {
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	width: 90%;
+	margin: 1em auto;
+	font: 100% sans-serif;
+}
+
+fieldset {
+	margin: 1em 0;
+	padding: 0 5em;
+	border: none;
+}
+
+label {
+	display: block;
+	margin: 1em 0 0;
+}
+
+label.checkboxlabel {
+	display: inline-block;
+	margin: auto;
+}
+
+input, textarea {
+	display: block;
+	width: 100%;
+	margin: .5rem 0;
+	padding: 1rem;
+	background-color: #eee;
+	border: 1px solid #ccc;
+	border-radius: 5px;
+	box-sizing: border-box;
+}
+
+textarea {
+	height: 10em;
+	resize: none;
+}
+
+input[type=checkbox] {
+	display: inline-block;
+	width: auto;
+	margin: auto;
+}
+
+input[type=button] {
+	width: 25%;
+	margin: .5em auto;
+	background-color: #ccc;
+	transition-duration: .5s;
+}
+
+input[type=button]:hover {
+	background-color: #eee;
+}
+
+.label {
+	margin: 1em 0 0;
+}
+
+.output {
+	display: block;
+	width: 100%;
+	margin: .5em 0;
+	padding: 1em;
+	background-color: #eee;
+	border: 1px solid #ccc;
+	border-radius: 5px;
+	box-sizing: border-box;
+}
+
+table {
+	width: 100%;
+	font-size: .75rem;
+	border-collapse: collapse;
+}
+
+td {
+	padding: .5rem 0;
+	border-bottom: 1px solid #ccc;
+	vertical-align: top;
+}
+
+tr:first-child td {
+	padding-top: 0;
+}
+
+tr:last-child td {
+	border-bottom: none;
+	padding-bottom: 0;
+}
+
+td.filesize {
+	text-align: right;
+	white-space: nowrap;
+}
+</style>
+<script src="lib/bencode.js"></script> <!-- borrowed from nutbread (https://github.com/nutbread/t2m) -->
+<script src="lib/sha1.js"></script> <!-- borrowed from nutbread (https://github.com/nutbread/t2m) -->
+<script>
+function generateFileSizeString(fileSizeInBytes) {
+	if (Math.abs(fileSizeInBytes) < 1024) { // using absolute value for support of negative values
+		return fileSizeInBytes + " B";
+	}
+
+	var units = ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
+	var unitIndex = -1;
+
+	do {
+		fileSizeInBytes /= 1024;
+		unitIndex++;
+	} while (Math.abs(fileSizeInBytes) >= 1024 && unitIndex < units.length - 1);
+
+	return fileSizeInBytes.toFixed(3) + " " + units[unitIndex];
+}
+
+
+function generateHex(str) {
+	var result = "";
+
+	for (var i = 0; i < str.length; i++) {
+		var hex = str.charCodeAt(i).toString(16);
+		result += ("0" + hex).slice(-2);
+	}
+
+	return result;
+}
+
+
+function deconstructTorrentFile() {
+	var file = document.getElementById("torrentfile").files[0];
+
+	var reader = new FileReader();
+	reader.readAsBinaryString(file);
+
+	reader.onload = function(event) {
+		var torrentData = Bencode.decode(event.target.result);
+		console.log("Torrent Data:", torrentData);
+
+		var torrentDataInfoHash = "";
+		var torrentDataInfoName = "";
+		var torrentDataTrackers = [];
+		var filesTableContent = "";
+
+		var torrentDataInfoBencoded = Bencode.encode(torrentData.info);
+
+		var torrentDataInfoHasher = new SHA1();
+		torrentDataInfoHasher.update(torrentDataInfoBencoded);
+		torrentDataInfoHash = torrentDataInfoHasher.digest();
+		torrentDataInfoHash = String.fromCharCode.apply(null, torrentDataInfoHash); // converting to binary string
+		torrentDataInfoHash = generateHex(torrentDataInfoHash);
+
+		if ("name" in torrentData.info) {
+			torrentDataInfoName = torrentData.info.name;
+		}
+
+		if ("announce" in torrentData) {
+			torrentDataTrackers.push(torrentData.announce);
+		}
+
+		if ("announce-list" in torrentData) {
+			for (var i = 0; i < torrentData["announce-list"].length; i++) {
+				for (var j = 0; j < torrentData["announce-list"][i].length; j++) {
+					if (torrentDataTrackers.indexOf(torrentData["announce-list"][i][j]) === -1) { // ignoring duplicates
+						torrentDataTrackers.push(torrentData["announce-list"][i][j]);
+					}
+				}
+			}
+		}
+
+		if ("files" in torrentData.info) {
+			var torrentDataInfoFiles = [];
+
+			for (var i = 0; i < torrentData.info.files.length; i++) {
+				if ("path" in torrentData.info.files[i]) {
+					var path = "";
+
+					for (var j = 0; j < torrentData.info.files[i].path.length; j++) {
+						path += torrentData.info.files[i].path[j];
+
+						if (j + 1 < torrentData.info.files[i].path.length) {
+							path += "/";
+						}
+					}
+
+					torrentDataInfoFiles.push({path: path, size: generateFileSizeString(torrentData.info.files[i].length)});
+				}
+			}
+
+			for (var i = 0; i < torrentDataInfoFiles.length; i++) {
+				filesTableContent += "<tr>\n";
+				filesTableContent += "<td>" + torrentDataInfoFiles[i].path + "</td>\n";
+				filesTableContent += "<td class=\"filesize\">" + torrentDataInfoFiles[i].size + "</td>\n";
+				filesTableContent += "</tr>\n";
+			}
+		}
+		else { // if the torrent does not contain multiple files
+			filesTableContent += "<tr>\n";
+			filesTableContent += "<td>" + torrentDataInfoName + "</td>\n";
+			filesTableContent += "<td class=\"filesize\">" + generateFileSizeString(torrentData.info.length) + "</td>\n";
+			filesTableContent += "</tr>\n";
+		}
+
+		document.getElementById("hash").value = torrentDataInfoHash;
+		document.getElementById("name").value = torrentDataInfoName;
+
+		document.getElementById("files").innerHTML = filesTableContent;
+
+		if (document.getElementById("remembertrackers").checked) {
+			document.getElementById("trackers").value += "\n" + torrentDataTrackers.join("\n");
+		}
+		else {
+			document.getElementById("trackers").value = torrentDataTrackers.join("\n");
+		}
+	};
+}
+
+
+function generateMagnetLink() {
+	var magnetLink = "magnet:";
+
+	magnetLink += "?xt=urn:btih:" + document.getElementById("hash").value;
+	magnetLink += "&dn=" + encodeURIComponent(document.getElementById("name").value);
+
+	var trackers = document.getElementById("trackers").value.split("\n");
+	for (var i = 0; i < trackers.length; i++){
+		if (trackers[i]) {
+			magnetLink += "&tr=" + encodeURIComponent(trackers[i]);
+		}
+	}
+
+	document.getElementById("labelmagnetlink").innerHTML = "<a href=\"" + magnetLink + "\">Magnet Link</a>";
+	document.getElementById("magnetlink").value = magnetLink;
+}
+
+
+function clearInputsAndOutputs() {
+	document.getElementById("hash").value = "";
+	document.getElementById("name").value = "";
+	document.getElementById("labelmagnetlink").innerHTML = "Magnet Link";
+	document.getElementById("magnetlink").value = "";
+	document.getElementById("files").innerHTML = "";
+
+	if (!document.getElementById("remembertrackers").checked) {
+		document.getElementById("trackers").value = "";
+	}
+}
+</script>
+</head>
+<body>
+<h1>Torrent File Decoder</h1>
+
+<p>Deconstruct torrent files and generate magnet URIs consisting of a BitTorrent info hash, a name and a few BitTorrent trackers.</p>
+
+<fieldset>
+<label id="labeltorrentfile" for="torrentfile">Torrent File</label>
+<input type="file" accept=".torrent" id="torrentfile"/>
+</fieldset>
+
+<input type="button" value="Deconstruct" title="fill input parameters for generating a new magnet link" onclick="deconstructTorrentFile()"/>
+
+<fieldset>
+<label for="hash">BitTorrent Info Hash</label>
+<input type="text" id="hash" value=""/>
+
+<label for="name">Display Name</label>
+<input type="text" id="name" value=""/>
+
+
+<div class="label">Files</div>
+<div class="output">
+<table id="files">
+</table>
+</div>
+
+<label for="trackers">Trackers</label>
+<textarea id="trackers">
+</textarea>
+<input type="checkbox" id="remembertrackers" />
+<label class="checkboxlabel" for="remembertrackers" title="new ones will be added at the end">Remember trackers</label>
+<p>You might find more public BitTorrent trackers in <a href="https://github.com/ngosang/trackerslist">ngosang's trackerlist</a>.</p>
+</fieldset>
+
+<input type="button" value="Generate" title="generate the magnet link" onclick="generateMagnetLink()"/>
+
+<input type="button" value="Clear" title="clear all inputs and outputs" onclick="clearInputsAndOutputs()"/>
+
+<fieldset>
+<label id="labelmagnetlink" for="magnetlink">Magnet Link</label>
+<input type="text" id="magnetlink" value=""/>
+</fieldset>
+</body>
+</html>
