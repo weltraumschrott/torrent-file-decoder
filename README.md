@@ -7,3 +7,5 @@ The magnet URI this tool generates consists of a BitTorrent info hash, a name an
 This simple conversion tool has not been written with any error handling in mind. It may only work with valid torrent files.
 
 Libraries for encoding bencoded data and generating SHA-1 hashes are borrowed from [nutbread](https://github.com/nutbread/t2m).
+
+Preview: https://htmlpreview.github.io/?https://github.com/weltraumschrott/torrent-file-decoder/blob/master/index.html
